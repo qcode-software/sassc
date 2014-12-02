@@ -1,72 +1,54 @@
-CC ?= gcc
-CFLAGS = -Wall -O2 -I $(SASS_LIBSASS_PATH) $(EXTRA_CFLAGS)
-LDFLAGS = -O2 $(EXTRA_LDFLAGS)
+NAME=sassc
+DPKG_NAME=$(NAME)-$(VERSION)
+LIBSASS_VERSION=$(VERSION)
+RELEASE=0
+TMP_DIR=/tmp/$(NAME)
+LIB_DIR=/usr/local/lib
+INSTALL_DIR=/usr/local/bin
+MAINTAINER=hackers@qcode.co.uk
+REMOTE_USER=debian.qcode.co.uk
+REMOTE_HOST=debian.qcode.co.uk
+REMOTE_DIR=debian.qcode.co.uk
 
-ifneq (,$(findstring /cygdrive/,$(PATH)))
-	UNAME := Cygwin
-else
-ifneq (,$(findstring WINDOWS,$(PATH)))
-	UNAME := Windows
-else
-	UNAME := $(shell uname -s)
-endif
-endif
-
-ifeq ($(UNAME),Darwin)
-	LDLIBS = -lstdc++ -lm -stdlib=libc++
-else
-	LDLIBS = -lstdc++ -lm
-endif
-
-SOURCES = sassc.c
+SOURCES = $(TMP_DIR)/sassc.c
 OBJECTS = $(SOURCES:.c=.o)
-TARGET = bin/sassc
-SPEC_PATH = $(SASS_SPEC_PATH)
 
-ifneq ($(BUILD), shared)
-	BUILD = static
-endif
+all: check-version package upload clean
 
-all: libsass $(TARGET)
+package: check-version
+	# Copy sassc files to pristine temporary directory
+	rm -rf $(TMP_DIR)
+	mkdir $(TMP_DIR)
+	curl --fail -K ~/.curlrc_github -L -o v$(VERSION).tar.gz https://api.github.com/repos/qcode-software/$(NAME)/tarball/v$(VERSION)
+	tar --strip-components=1 -xzvf v$(VERSION).tar.gz -C $(TMP_DIR)
 
-$(TARGET): build-$(BUILD)
+	# Copy libsass files to pristine temporary directory
+	mkdir $(TMP_DIR)/libsass
+	curl --fail -K ~/.curlrc_github -L -o v$(VERSION).tar.gz https://api.github.com/repos/qcode-software/libsass/tarball/v$(VERSION)
+	tar --strip-components=1 -xzvf v$(LIBSASS_VERSION).tar.gz -C $(TMP_DIR)/libsass
 
-build-static: $(OBJECTS) $(SASS_LIBSASS_PATH)/lib/libsass.a
-	$(CC) $(LDFLAGS) -o $(TARGET) $^ $(LDLIBS)
+	fakeroot checkinstall -D --deldoc --backup=no --install=no --pkgname=$(DPKG_NAME) --pkgversion=$(VERSION) --pkgrelease=$(RELEASE) --pkglicense="PUBLIC" -A all -y --maintainer $(MAINTAINER) --reset-uids=yes --requires "libsass" --replaces none --conflicts none make install
 
-build-shared: $(OBJECTS) $(SASS_LIBSASS_PATH)/lib/libsass.so
-	$(CC) $(LDFLAGS) -o $(TARGET) $^ $(LDLIBS)
+install: $(OBJECTS) $(TMP_DIR)/lib/libsass.so
+	cd $(TMP_DIR) && gcc -O2 -o $(INSTALL_DIR)/$(NAME)  $^
 
-$(SASS_LIBSASS_PATH)/lib/libsass.a: libsass-static
-$(SASS_LIBSASS_PATH)/lib/libsass.so: libsass-shared
-
-libsass: libsass-$(BUILD)
-
-libsass-static:
-ifdef SASS_LIBSASS_PATH
-	BUILD="static" $(MAKE) -C $(SASS_LIBSASS_PATH)
-else
-	$(error SASS_LIBSASS_PATH must be defined)
-endif
-
-libsass-shared:
-ifdef SASS_LIBSASS_PATH
-	BUILD="shared" $(MAKE) -C $(SASS_LIBSASS_PATH)
-else
-	$(error SASS_LIBSASS_PATH must be defined)
-endif
+$(TMP_DIR)/lib/libsass.so:
+	$(MAKE) -C $(TMP_DIR)/libsass build VERSION=$(LIBSASS_VERSION) TMP_DIR=$(TMP_DIR)/libsass
 
 %.o: %.c
-	$(CC) -c $(CFLAGS) $< -o $@
+	cd $(TMP_DIR) && gcc -c -Wall -O2 -I $(TMP_DIR)/libsass $< -o $@
 
-test: all
-	bin/sassc -h
+upload: check-version
+	scp $(DPKG_NAME)_$(VERSION)-$(RELEASE)_all.deb "$(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/debs"	
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) reprepro -b $(REMOTE_DIR) includedeb squeeze $(REMOTE_DIR)/debs/$(DPKG_NAME)_$(VERSION)-$(RELEASE)_all.deb
+	ssh $(REMOTE_USER)@$(REMOTE_HOST) reprepro -b $(REMOTE_DIR) includedeb wheezy $(REMOTE_DIR)/debs/$(DPKG_NAME)_$(VERSION)-$(RELEASE)_all.deb
 
-clean:
-	rm -f $(OBJECTS) $(TARGET)
-ifdef SASS_LIBSASS_PATH
-	$(MAKE) -C $(SASS_LIBSASS_PATH) clean
+clean: 
+	rm -f $(DPKG_NAME)*_all.deb v$(VERSION).tar.gz
+
+.PHONY: all
+
+check-version:
+ifndef VERSION
+    $(error VERSION is undefined. Usage make VERSION=x.x.x LIBSASS_REPO_PATH=x/x/x)
 endif
-
-.PHONY: clean libsass libsass-static libsass-shared build-static build-shared test
-.DELETE_ON_ERROR:
