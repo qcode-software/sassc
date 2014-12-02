@@ -1,9 +1,10 @@
 NAME=sassc
 DPKG_NAME=$(NAME)-$(VERSION)
+LIBSASS_VERSION=$(VERSION)
 RELEASE=0
 TMP_DIR=/tmp/$(NAME)
 LIB_DIR=/usr/local/lib
-INSTALL_DIR =/usr/local/bin
+INSTALL_DIR=/usr/local/bin
 MAINTAINER=hackers@qcode.co.uk
 REMOTE_USER=debian.qcode.co.uk
 REMOTE_HOST=debian.qcode.co.uk
@@ -24,12 +25,15 @@ package: check-version
 	# Copy libsass files to pristine temporary directory
 	mkdir $(TMP_DIR)/libsass
 	curl --fail -K ~/.curlrc_github -L -o v$(VERSION).tar.gz https://api.github.com/repos/qcode-software/libsass/tarball/v$(VERSION)
-	tar --strip-components=1 -xzvf v$(VERSION).tar.gz -C $(TMP_DIR)/libsass
+	tar --strip-components=1 -xzvf v$(LIBSASS_VERSION).tar.gz -C $(TMP_DIR)/libsass
 
 	fakeroot checkinstall -D --deldoc --backup=no --install=no --pkgname=$(DPKG_NAME) --pkgversion=$(VERSION) --pkgrelease=$(RELEASE) --pkglicense="PUBLIC" -A all -y --maintainer $(MAINTAINER) --reset-uids=yes --requires "libsass" --replaces none --conflicts none make install
 
-install: $(OBJECTS) $(LIB_DIR)/libsass.so
-	cd $(TMP_DIR) && gcc -O2 -o $(INSTALL_DIR)/$(NAME)  $^ 
+install: $(OBJECTS) $(TMP_DIR)/lib/libsass.so
+	cd $(TMP_DIR) && gcc -O2 -o $(INSTALL_DIR)/$(NAME)  $^
+
+$(TMP_DIR)/lib/libsass.so:
+	$(MAKE) -C $(TMP_DIR)/libsass build VERSION=$(LIBSASS_VERSION) TMP_DIR=$(TMP_DIR)/libsass
 
 %.o: %.c
 	cd $(TMP_DIR) && gcc -c -Wall -O2 -I $(TMP_DIR)/libsass $< -o $@
