@@ -9,7 +9,7 @@ REMOTE_USER=debian.qcode.co.uk
 REMOTE_HOST=debian.qcode.co.uk
 REMOTE_DIR=debian.qcode.co.uk
 
-SOURCES = sassc.c
+SOURCES = $(TMP_DIR)/sassc.c
 OBJECTS = $(SOURCES:.c=.o)
 
 all: check-version package upload clean
@@ -26,7 +26,7 @@ package: check-version
 	curl --fail -K ~/.curlrc_github -L -o v$(VERSION).tar.gz https://api.github.com/repos/qcode-software/libsass/tarball/v$(VERSION)
 	tar --strip-components=1 -xzvf v$(VERSION).tar.gz -C $(TMP_DIR)/libsass
 
-	fakeroot checkinstall -D --deldoc --backup=no --install=no --pkgname=$(DPKG_NAME) --pkgversion=$(VERSION) --pkgrelease=$(RELEASE) --pkglicense="PUBLIC" -A all -y --maintainer $(MAINTAINER) --reset-uids=yes --replaces none --conflicts none make install
+	fakeroot checkinstall -D --deldoc --backup=no --install=no --pkgname=$(DPKG_NAME) --pkgversion=$(VERSION) --pkgrelease=$(RELEASE) --pkglicense="PUBLIC" -A all -y --maintainer $(MAINTAINER) --reset-uids=yes --requires "libsass" --replaces none --conflicts none make install
 
 install: $(OBJECTS) $(LIB_DIR)/libsass.so
 	cd $(TMP_DIR) && gcc -O2 -o $(INSTALL_DIR)/$(NAME)  $^ 
