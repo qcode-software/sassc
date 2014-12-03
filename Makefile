@@ -44,7 +44,7 @@ upload: check-version
 	ssh $(REMOTE_USER)@$(REMOTE_HOST) reprepro -b $(REMOTE_DIR) includedeb wheezy $(REMOTE_DIR)/debs/$(DPKG_NAME)_$(VERSION)-$(RELEASE)_all.deb
 
 clean: 
-	rm -f $(DPKG_NAME)*_all.deb v$(VERSION).tar.gz /tmp/$(NAME)
+	rm -rf $(DPKG_NAME)*_all.deb v$(VERSION).tar.gz /tmp/$(NAME)
 
 .PHONY: all
 
